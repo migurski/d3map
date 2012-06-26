@@ -134,47 +134,45 @@
                 gl.enableVertexAttribArray(vertex_pos_attrib);
                 gl.enableVertexAttribArray(vertex_tex_attrib);
                 
+                // set up array buffer thingies
+                
+                var tiles_vertex_buffer = gl.createBuffer(),
+                    tiles_texture_buffer = gl.createBuffer(),
+                    tiles_index_buffer = gl.createBuffer(),
+                    tiles_vertex_array = new Float32Array(256 * 8),
+                    tiles_texture_array = new Float32Array(256 * 8),
+                    tiles_index_array = new Uint16Array(256 * 6);
+            
+                // populate triangle indexes
+                
+                var node_index_list = [0, 1, 2, 0, 2, 3];
+                
+                for(var i = 0; i < tiles_index_array.length; i++)
+                {
+                    var base = 4 * Math.floor(i / 6),
+                        off = i % 6;
+                    
+                    tiles_index_array[i] = base + node_index_list[off];
+                }
+                
+                gl.bindBuffer(gl.ARRAY_BUFFER, tiles_vertex_buffer);
+                gl.bufferData(gl.ARRAY_BUFFER, tiles_vertex_array, gl.STATIC_DRAW);
+                
+                gl.bindBuffer(gl.ARRAY_BUFFER, tiles_texture_buffer);
+                gl.bufferData(gl.ARRAY_BUFFER, tiles_texture_array, gl.STATIC_DRAW);
+                
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, tiles_index_buffer);
+                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, tiles_index_array, gl.STATIC_DRAW);
+
+                // set up a view matrix
+                
+                var view = gl.getUniformLocation(program, 'view');
+                    mat4 = new Float32Array([2.0/c.width, 0, 0, 0, 0, -2.0/c.height, 0, 0, 0, 0, 1, 0, -1, 1, 0, 1]);
+                
+                gl.uniformMatrix4fv(view, false, mat4);
+
                 function redraw()
                 {
-                    // set up array buffer thingies
-                    
-                    var tiles_vertex_buffer = gl.createBuffer(),
-                        tiles_texture_buffer = gl.createBuffer(),
-                        tiles_index_buffer = gl.createBuffer(),
-                        tiles_vertex_array = new Float32Array(tiles.length * 8),
-                        tiles_texture_array = new Float32Array(tiles.length * 8),
-                        tiles_index_array = new Uint16Array(tiles.length * 6);
-                
-                    // populate triangle indexes
-                    
-                    var node_index_list = [0, 1, 2, 0, 2, 3];
-                    
-                    for(var i = 0; i < tiles_index_array.length; i++)
-                    {
-                        var base = 4 * Math.floor(i / 6),
-                            off = i % 6;
-                        
-                        tiles_index_array[i] = base + node_index_list[off];
-                    }
-                    
-                    gl.bindBuffer(gl.ARRAY_BUFFER, tiles_vertex_buffer);
-                    gl.bufferData(gl.ARRAY_BUFFER, tiles_vertex_array, gl.STATIC_DRAW);
-                    
-                    gl.bindBuffer(gl.ARRAY_BUFFER, tiles_texture_buffer);
-                    gl.bufferData(gl.ARRAY_BUFFER, tiles_texture_array, gl.STATIC_DRAW);
-                    
-                    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, tiles_index_buffer);
-                    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, tiles_index_array, gl.STATIC_DRAW);
-
-
-                
-                    var view = gl.getUniformLocation(program, 'view');
-                        mat4 = new Float32Array([2.0/c.width, 0, 0, 0, 0, -2.0/c.height, 0, 0, 0, 0, 1, 0, -1, 1, 0, 1]);
-                    
-                    gl.uniformMatrix4fv(view, false, mat4);
-
-
-
                     for(var i = 0; i < tiles.length; i++)
                     {
                         var x = tiles[i].x,
@@ -506,9 +504,12 @@
                 }
                 
                 var visibleCoords = [];
+                var status = {coords: visibleCoords, dirty: false};
 
                 function redraw()
                 {
+                    status.dirty = true;
+                
                     // apply coord limits
                     if (coord.z > 18) {
                         coord = Coordinates.zoomedBy(coord, 18-coord.z);
@@ -675,23 +676,28 @@
                     d3.timer(redraw);
                 }
                 
-                return visibleCoords;
+                return status;
             };
 
             window.onload = function() {
             
                 // Grid returns a reference to the visible coordinates array
-                var coords = Grid('#map');
-                var redrawGL = theGLPart(coords);
+                var grid_stat = Grid('#map');
+                var redrawGL = theGLPart(grid_stat.coords);
                 
                 function animationLoop()
                 {
                     requestAnimationFrame(animationLoop);
         
-                    gl.clearColor(0.824, 0.788, 0.580, 1);
-                    gl.clear(gl.COLOR_BUFFER_BIT);
+                    if(grid_stat.dirty)
+                    {
+                        gl.clearColor(0.824, 0.788, 0.580, 1);
+                        gl.clear(gl.COLOR_BUFFER_BIT);
+                        
+                        redrawGL();
+                    }
                     
-                    redrawGL();
+                    grid_stat.dirty = false;
                 }
                 
                 animationLoop();
