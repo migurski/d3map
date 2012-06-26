@@ -369,44 +369,27 @@
                     // Takes the place of just String on coordinates below
                     function coordString(c) { return [c.c, c.r, c.z].toString() };
                     
-                    var tiles = map.selectAll('img.tile')
+                    var tiles = map.selectAll('div.tile')
                        .data(visibleCoords, coordString);
 
                     // setup new things                        
-                    tiles.enter().append('img')
+                    tiles.enter().append('div')
                         .attr("id", coordString)
                         .attr("class", "tile")
-                        .style("opacity", 0.0)
-                        .style("display", "none") // opacity doesn't seem to "take" until load event fires
-                        .style("z-index", function(tile) { return 100 * tile.z })
-                        .on('load', onTileLoaded)
-                        .each(queue.addTo) // sets img src 8 at a time using provider()
+                        .text(coordString);
 
                     // TODO: on('error')?
 
-                    // ensure updating tiles are at opacity 1.0 (if old enough)
-                    tiles.filter(loadedLongAgo).transition().duration(250).style("opacity", 1.0);
-
                     // clean up old things
-                    tiles.exit()
-                        .each(queue.removeFrom)
-                        .transition()
-                          .duration(250)
-                            .style("opacity", 0.0)
-                              .delay(250)
-                                .remove()
-                                  .each('end',function() {
-                                    // prevents blank tiles if zooming confuses transitions
-                                    d3.timer(redraw,50);
-                                  });
+                    tiles.exit().remove();
                                 
                     
                     // update all positions, enter/update/exit alike
                     if (transformProperty) {
-                        map.selectAll('img.tile')
+                        map.selectAll('div.tile')
                             .style(transformProperty, transform);                        
                     } else {
-                        map.selectAll('img.tile')
+                        map.selectAll('div.tile')
                             .style("left", left)
                             .style("top", top)
                             .style("width", width)
@@ -536,6 +519,7 @@
 		        padding: 0;
 		        border: 0;
 		    }
+		    div.tile,
 		    img.tile {
 		        display: block;
 		        position: absolute;
