@@ -309,6 +309,8 @@
                 {
                     return (this.src in loadedTiles) && (Date.now() - loadedTiles[this.src] > 500);
                 }
+                
+                var visibleCoords = [];
 
                 function redraw()
                 {
@@ -331,15 +333,20 @@
                     // generate visible tile coords           
                     var padding = 0;
                     var cols = d3.range( Math.floor(tl.c) - padding, Math.ceil(br.c) + padding),
-                        rows = d3.range( Math.floor(tl.r) - padding, Math.ceil(br.r) + padding),
-                        visibleCoords = [];
+                        rows = d3.range( Math.floor(tl.r) - padding, Math.ceil(br.r) + padding);
+                    
+                    visibleCoords.splice(0, visibleCoords.length);
+                    
                     rows.forEach(function(row) {
                         cols.forEach(function(col) {
-                            visibleCoords.push({c: col, r: row, z: roundCoord.z});
+                            var coord = {c: col, r: row, z: roundCoord.z};
+                            
+                            if(validCoordinateFilter(coord))
+                            {
+                                visibleCoords.push(coord);
+                            }
                         });
                     });
-                    
-                    visibleCoords = visibleCoords.filter(validCoordinateFilter);
                     
                     // explicitly preserve parent tiles for tiles we haven't already loaded
                     // not strictly necessary but helps with continuity on slow connections
@@ -462,11 +469,16 @@
                     center = {x: window.innerWidth/2, y: window.innerHeight/2}
                     d3.timer(redraw);
                 }
+                
+                return visibleCoords;
             };
 
             window.onload = function() {
             
-                Grid('#map');
+                // Grid returns a reference to the visible coordinates array
+                var coords = Grid('#map');
+                
+                window.setTimeout(function() { console.log(coords) }, 1000);
   
             }
             
@@ -513,11 +525,13 @@
 		        border: 0;
 		    }
 		    #map {
-		        position: absolute;
+		        width: 1200px;
+		        height: 600px;
+		        border: 1px solid pink;
+		        position: relative;
 		        overflow: hidden;
 		        margin: 0;
 		        padding: 0;
-		        border: 0;
 		    }
 		    div.tile,
 		    img.tile {
@@ -546,7 +560,7 @@
 		</style>
     </head>
     <body>
-        <div id="map" style="width: 100%; height: 100%;"></div>
+        <div id="map"></div>
         <p>Tiles &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, CC-BY-SA. Courtesy of <a href="http://www.mapquest.com/" target="_blank">MapQuest</a> <img src="http://developer.mapquest.com/content/osm/mq_logo.png"></p>
     </body>
 </html>
