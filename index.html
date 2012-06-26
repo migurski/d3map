@@ -13,6 +13,201 @@
              https://github.com/mbostock/d3/blob/master/LICENSE
              Forks welcome! -->
         <script src="http://mbostock.github.com/d3/d3.min.js"></script>
+
+        <script id="shader-vs" type="x-shader/x-vertex">
+            
+            uniform mat4 view;
+            
+            attribute vec2 pos;
+            attribute vec2 tex;
+            
+            varying vec2 vertex_coord;
+            varying vec2 texture_coord;
+    
+            void main()
+            {
+                // vec4 fills in the remaining z, w dimensions here
+                gl_Position = view * vec4(pos, 0, 1);
+                
+                vertex_coord = pos;
+                texture_coord = tex;
+            }
+            
+        </script>
+        <script id="shader-fs" type="x-shader/x-fragment">
+            
+            precision mediump float;
+            
+            uniform sampler2D texture_sampler;
+    
+            varying vec2 vertex_coord;
+            varying vec2 texture_coord;
+            
+            void main()
+            {
+                gl_FragColor = vec4(1, 1, 1, 1);
+            }
+            
+        </script>
+    
+        <script type="text/javascript">
+            
+            // http://paulirish.com/2011/requestanimationframe-for-smart-animating/
+            // http://my.opera.com/emoller/blog/2011/12/20/requestanimationframe-for-smart-er-animating
+            
+            // requestAnimationFrame polyfill by Erik Möller
+            // fixes from Paul Irish and Tino Zijdel
+            
+            (function() {
+                var lastTime = 0;
+                var vendors = ['ms', 'moz', 'webkit', 'o'];
+                for(var x = 0; x < vendors.length && !window.requestAnimationFrame; ++x) {
+                    window.requestAnimationFrame = window[vendors[x]+'RequestAnimationFrame'];
+                    window.cancelAnimationFrame = window[vendors[x]+'CancelAnimationFrame'] 
+                                               || window[vendors[x]+'CancelRequestAnimationFrame'];
+                }
+             
+                if (!window.requestAnimationFrame)
+                    window.requestAnimationFrame = function(callback, element) {
+                        var currTime = new Date().getTime();
+                        var timeToCall = Math.max(0, 16 - (currTime - lastTime));
+                        var id = window.setTimeout(function() { callback(currTime + timeToCall); }, 
+                          timeToCall);
+                        lastTime = currTime + timeToCall;
+                        return id;
+                    };
+             
+                if (!window.cancelAnimationFrame)
+                    window.cancelAnimationFrame = function(id) {
+                        clearTimeout(id);
+                    };
+            }());
+        
+            function linkProgram(gl, vsource, fsource)
+            {
+                var program = gl.createProgram(),
+                    vshader = createShader(gl, vsource, gl.VERTEX_SHADER),
+                    fshader = createShader(gl, fsource, gl.FRAGMENT_SHADER);
+            
+                gl.attachShader(program, vshader);
+                gl.attachShader(program, fshader);
+                gl.linkProgram(program);
+            
+                if(!gl.getProgramParameter(program, gl.LINK_STATUS))
+                {
+                    throw gl.getProgramInfoLog(program);
+                }
+                
+                return program;
+            }
+            
+            function createShader(gl, source, type)
+            {
+                var shader = gl.createShader(type);
+                gl.shaderSource(shader, source);
+                gl.compileShader(shader);
+            
+                if(!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
+                {
+                    throw gl.getShaderInfoLog(shader);
+                }
+            
+                return shader;
+            }
+            
+            function theGLPart(tiles)
+            {
+                var c = document.getElementById('c')
+                    gl = c.getContext('experimental-webgl');
+                
+                // create the WebGL program, store it in "program"
+                
+                var vsource = document.getElementById('shader-vs').innerText,
+                    fsource = document.getElementById('shader-fs').innerText,
+                    program = linkProgram(gl, vsource, fsource);
+                
+                gl.useProgram(program);
+
+                var vertex_pos_attrib = gl.getAttribLocation(program, 'pos'),
+                    vertex_tex_attrib = gl.getAttribLocation(program, 'tex');
+            
+                gl.enableVertexAttribArray(vertex_pos_attrib);
+                gl.enableVertexAttribArray(vertex_tex_attrib);
+                
+                function redraw()
+                {
+                    // set up array buffer thingies
+                    
+                    var tiles_vertex_buffer = gl.createBuffer(),
+                        tiles_texture_buffer = gl.createBuffer(),
+                        tiles_index_buffer = gl.createBuffer(),
+                        tiles_vertex_array = new Float32Array(tiles.length * 8),
+                        tiles_texture_array = new Float32Array(tiles.length * 8),
+                        tiles_index_array = new Uint16Array(tiles.length * 6);
+                
+                    // populate triangle indexes
+                    
+                    var node_index_list = [0, 1, 2, 0, 2, 3];
+                    
+                    for(var i = 0; i < tiles_index_array.length; i++)
+                    {
+                        var base = 4 * Math.floor(i / 6),
+                            off = i % 6;
+                        
+                        tiles_index_array[i] = base + node_index_list[off];
+                    }
+                    
+                    gl.bindBuffer(gl.ARRAY_BUFFER, tiles_vertex_buffer);
+                    gl.bufferData(gl.ARRAY_BUFFER, tiles_vertex_array, gl.STATIC_DRAW);
+                    
+                    gl.bindBuffer(gl.ARRAY_BUFFER, tiles_texture_buffer);
+                    gl.bufferData(gl.ARRAY_BUFFER, tiles_texture_array, gl.STATIC_DRAW);
+                    
+                    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, tiles_index_buffer);
+                    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, tiles_index_array, gl.STATIC_DRAW);
+
+
+                
+                    var view = gl.getUniformLocation(program, 'view');
+                        mat4 = new Float32Array([2.0/c.width, 0, 0, 0, 0, -2.0/c.height, 0, 0, 0, 0, 1, 0, -1, 1, 0, 1]);
+                    
+                    gl.uniformMatrix4fv(view, false, mat4);
+
+
+
+                    for(var i = 0; i < tiles.length; i++)
+                    {
+                        var x = tiles[i].x,
+                            y = tiles[i].y,
+                            w = tiles[i].w,
+                            h = tiles[i].h,
+                            off = i * 8;
+                        
+                        tiles_vertex_array[off + 0] = x;
+                        tiles_vertex_array[off + 1] = y;
+                        tiles_vertex_array[off + 2] = x + w - 2;
+                        tiles_vertex_array[off + 3] = y;
+                        tiles_vertex_array[off + 4] = x + w - 2;
+                        tiles_vertex_array[off + 5] = y + h - 2;
+                        tiles_vertex_array[off + 6] = x;
+                        tiles_vertex_array[off + 7] = y + h - 2;
+                    }
+                    
+                    gl.bindBuffer(gl.ARRAY_BUFFER, tiles_vertex_buffer);
+                    gl.bufferData(gl.ARRAY_BUFFER, tiles_vertex_array, gl.STATIC_DRAW);
+                    gl.vertexAttribPointer(vertex_pos_attrib, 2, gl.FLOAT, false, 0, 0);
+                    
+                    gl.bindBuffer(gl.ARRAY_BUFFER, tiles_texture_buffer);
+                    gl.vertexAttribPointer(vertex_tex_attrib, 2, gl.FLOAT, false, 0, 0);
+                    
+                    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, tiles_index_buffer);
+                    gl.drawElements(gl.TRIANGLES, tiles.length * 6, gl.UNSIGNED_SHORT, 0);
+                }
+                
+                return redraw;
+            }
+        
+        </script>
         <script type="text/javascript">
         
             // borrowed from Modest Maps, inspired by LeafletJS
@@ -343,6 +538,12 @@
                             
                             if(validCoordinateFilter(coord))
                             {
+                                // attach an (x, y) for use outside Grid()
+                                coord.x = parseInt(left(coord));
+                                coord.y = parseInt(top(coord));
+                                coord.w = parseInt(width(coord));
+                                coord.h = parseInt(height(coord));
+
                                 visibleCoords.push(coord);
                             }
                         });
@@ -371,7 +572,11 @@
                     }
 
                     visibleCoords.forEach(addParentIfNeeded);
-                    visibleCoords = compensationCoords.concat(visibleCoords);
+                    
+                    for(var i = 0; i < compensationCoords.length; i++)
+                    {
+                        visibleCoords.push(compensationCoords[i]);
+                    }
 
                     // Takes the place of just String on coordinates below
                     function coordString(c) { return [c.c, c.r, c.z].toString() };
@@ -477,9 +682,19 @@
             
                 // Grid returns a reference to the visible coordinates array
                 var coords = Grid('#map');
+                var redrawGL = theGLPart(coords);
                 
-                window.setTimeout(function() { console.log(coords) }, 1000);
-  
+                function animationLoop()
+                {
+                    requestAnimationFrame(animationLoop);
+        
+                    gl.clearColor(0.824, 0.788, 0.580, 1);
+                    gl.clear(gl.COLOR_BUFFER_BIT);
+                    
+                    redrawGL();
+                }
+                
+                animationLoop();
             }
             
             // expose this so our own mousewheel handler can use it
@@ -518,6 +733,7 @@
 		</script>
 		<style>
 		    html, body {
+		        background: #ddd;
 		        width: 100%;
 		        height: 100%;
 		        margin: 0;
@@ -525,13 +741,17 @@
 		        border: 0;
 		    }
 		    #map {
-		        width: 1200px;
-		        height: 600px;
-		        border: 1px solid pink;
 		        position: relative;
 		        overflow: hidden;
 		        margin: 0;
 		        padding: 0;
+		    }
+		    #c, #map
+		    {
+		        border: 1px solid orange;
+		        position: absolute;
+		        top: 10px;
+		        left: 10px;
 		    }
 		    div.tile,
 		    img.tile {
@@ -560,7 +780,8 @@
 		</style>
     </head>
     <body>
-        <div id="map"></div>
+        <canvas id="c" width="1200" height="300"></canvas>
+        <div id="map" style="width: 1200px; height: 300px;"></div>
         <p>Tiles &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, CC-BY-SA. Courtesy of <a href="http://www.mapquest.com/" target="_blank">MapQuest</a> <img src="http://developer.mapquest.com/content/osm/mq_logo.png"></p>
     </body>
 </html>
