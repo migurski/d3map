@@ -115,7 +115,7 @@
                 return shader;
             }
             
-            function theGLPart(tiles)
+            function theGLPart(tiles, entering, exiting)
             {
                 var c = document.getElementById('c')
                     gl = c.getContext('experimental-webgl');
@@ -141,18 +141,16 @@
                     img = new Image();
                 
                 gl.bindTexture(gl.TEXTURE_2D, texture);
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2048, 2048, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256*8, 256*8, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
                 gl.generateMipmap(gl.TEXTURE_2D);
                 
-                img.onload = function()
-                {
-                    gl.bindTexture(gl.TEXTURE_2D, texture);
-                    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, img);
-                }
+                gl.activeTexture(gl.TEXTURE0);
+                gl.uniform1i(tex_sampler, 0);
                 
-                img.src = 'toner-12-656-1582.png';
+                var texture_slots = new Int8Array(8*8),
+                    tile_textures = {};
                 
                 // set up array buffer thingies
                 
@@ -191,9 +189,65 @@
                     mat4 = new Float32Array([2.0/c.width, 0, 0, 0, 0, -2.0/c.height, 0, 0, 0, 0, 1, 0, -1, 1, 0, 1]);
                 
                 gl.uniformMatrix4fv(view, false, mat4);
+                
+                function tileKey(tile)
+                {
+                    return [tile.z, tile.c, tile.r].join('/');
+                }
+                
+                function loadTile(tile, s, t)
+                {
+                    var img = new Image();
+                    
+                    img.onload = function()
+                    {
+                        gl.texSubImage2D(gl.TEXTURE_2D, 0, s*256*8, t*256*8, gl.RGBA, gl.UNSIGNED_BYTE, img);
+                        redraw();
+                    }
+                    
+                    img.src = 'slimjim.php?url=http://tile.stamen.com/toner/'+tileKey(tile)+'.png';
+                }
 
                 function redraw()
                 {
+                    for(var i = 0; i < exiting.length; i++)
+                    {
+                        var key = tileKey(exiting[i]);
+                    
+                        if(tile_textures.hasOwnProperty(key))
+                        {
+                            texture_slots[tile_textures[key].slot] = 0;
+                            delete tile_textures[key];
+                        }
+                    }
+
+                    for(var i = 0; i < entering.length; i++)
+                    {
+                        var tile = entering[i],
+                            key = tileKey(tile);
+                    
+                        if(tile_textures.hasOwnProperty(key))
+                        {
+                            continue;
+                        }
+                    
+                        for(var slot = 0; slot < texture_slots.length; slot++)
+                        {
+                            // look for a free texture slot
+                            if(texture_slots[slot] == 0)
+                            {
+                                var s = (slot % 8) / 8,
+                                    t = Math.floor(slot / 8) / 8;
+                                
+                                texture_slots[slot] = 1;
+                                tile_textures[key] = {tile: tile, slot: slot, s: s, t: t};
+
+                                loadTile(tile, s, t);
+                                break;
+                            }
+                        }
+                    }
+                    
                     for(var i = 0; i < tiles.length; i++)
                     {
                         var x = tiles[i].x,
@@ -204,26 +258,29 @@
                         
                         tiles_vertex_array[off + 0] = x;
                         tiles_vertex_array[off + 1] = y;
-                        tiles_vertex_array[off + 2] = x + w - 2;
+                        tiles_vertex_array[off + 2] = x + w;
                         tiles_vertex_array[off + 3] = y;
-                        tiles_vertex_array[off + 4] = x + w - 2;
-                        tiles_vertex_array[off + 5] = y + h - 2;
+                        tiles_vertex_array[off + 4] = x + w;
+                        tiles_vertex_array[off + 5] = y + h;
                         tiles_vertex_array[off + 6] = x;
-                        tiles_vertex_array[off + 7] = y + h - 2;
+                        tiles_vertex_array[off + 7] = y + h;
                         
-                        tiles_texture_array[off + 0] = 0;
-                        tiles_texture_array[off + 1] = 0;
-                        tiles_texture_array[off + 2] = 1/8;
-                        tiles_texture_array[off + 3] = 0;
-                        tiles_texture_array[off + 4] = 1/8;
-                        tiles_texture_array[off + 5] = 1/8;
-                        tiles_texture_array[off + 6] = 0;
-                        tiles_texture_array[off + 7] = 1/8;
+                        var key = tileKey(tiles[i]);
+                        
+                        if(tile_textures.hasOwnProperty(key))
+                        {
+                            var s = tile_textures[key].s, t = tile_textures[key].t;
+                            
+                            tiles_texture_array[off + 0] = s;
+                            tiles_texture_array[off + 1] = t;
+                            tiles_texture_array[off + 2] = s + 1/8;
+                            tiles_texture_array[off + 3] = t;
+                            tiles_texture_array[off + 4] = s + 1/8;
+                            tiles_texture_array[off + 5] = t + 1/8;
+                            tiles_texture_array[off + 6] = s;
+                            tiles_texture_array[off + 7] = t + 1/8;
+                        }
                     }
-                    
-                    gl.activeTexture(gl.TEXTURE0);
-                    gl.bindTexture(gl.TEXTURE_2D, texture);
-                    gl.uniform1i(tex_sampler, 0);
                     
                     gl.bindBuffer(gl.ARRAY_BUFFER, tiles_vertex_buffer);
                     gl.bufferData(gl.ARRAY_BUFFER, tiles_vertex_array, gl.STATIC_DRAW);
@@ -539,7 +596,7 @@
                 }
                 
                 var visibleCoords = [];
-                var status = {coords: visibleCoords, dirty: false};
+                var status = {coords: visibleCoords, dirty: false, entering: [], exiting: []};
 
                 function redraw()
                 {
@@ -620,17 +677,21 @@
                     var tiles = map.selectAll('div.tile')
                        .data(visibleCoords, coordString);
 
+                    status.entering.splice(0, status.entering.length);
+                    status.exiting.splice(0, status.exiting.length);
+                    
                     // setup new things                        
                     tiles.enter().append('div')
                         .attr("id", coordString)
                         .attr("class", "tile")
-                        .text(coordString);
+                        .text(coordString)
+                        .each(function(tile) { status.entering.push(tile) });
 
                     // TODO: on('error')?
 
                     // clean up old things
-                    tiles.exit().remove();
-                                
+                    tiles.exit().remove()
+                        .each(function(tile) { status.exiting.push(tile) });
                     
                     // update all positions, enter/update/exit alike
                     if (transformProperty) {
@@ -718,7 +779,7 @@
             
                 // Grid returns a reference to the visible coordinates array
                 var grid_stat = Grid('#map');
-                var redrawGL = theGLPart(grid_stat.coords);
+                var redrawGL = theGLPart(grid_stat.coords, grid_stat.entering, grid_stat.exiting);
                 
                 function animationLoop()
                 {
