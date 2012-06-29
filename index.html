@@ -45,7 +45,7 @@
             
             void main()
             {
-                gl_FragColor = vec4(1, 1, 1, 1);
+                gl_FragColor = texture2D(texture_sampler, vec2(texture_coord.s, texture_coord.t)); //vec4(1, 1, 1, 1);
             }
             
         </script>
@@ -134,6 +134,26 @@
                 gl.enableVertexAttribArray(vertex_pos_attrib);
                 gl.enableVertexAttribArray(vertex_tex_attrib);
                 
+                // set up a texture
+                
+                var tex_sampler = gl.getUniformLocation(program, 'texture_sampler'),
+                    texture = gl.createTexture(),
+                    img = new Image();
+                
+                gl.bindTexture(gl.TEXTURE_2D, texture);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2048, 2048, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                gl.generateMipmap(gl.TEXTURE_2D);
+                
+                img.onload = function()
+                {
+                    gl.bindTexture(gl.TEXTURE_2D, texture);
+                    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, img);
+                }
+                
+                img.src = 'toner-12-656-1582.png';
+                
                 // set up array buffer thingies
                 
                 var tiles_vertex_buffer = gl.createBuffer(),
@@ -149,6 +169,7 @@
                 
                 for(var i = 0; i < tiles_index_array.length; i++)
                 {
+                    // base advances the indexes forward to the next square tile
                     var base = 4 * Math.floor(i / 6),
                         off = i % 6;
                     
@@ -189,13 +210,27 @@
                         tiles_vertex_array[off + 5] = y + h - 2;
                         tiles_vertex_array[off + 6] = x;
                         tiles_vertex_array[off + 7] = y + h - 2;
+                        
+                        tiles_texture_array[off + 0] = 0;
+                        tiles_texture_array[off + 1] = 0;
+                        tiles_texture_array[off + 2] = 1/8;
+                        tiles_texture_array[off + 3] = 0;
+                        tiles_texture_array[off + 4] = 1/8;
+                        tiles_texture_array[off + 5] = 1/8;
+                        tiles_texture_array[off + 6] = 0;
+                        tiles_texture_array[off + 7] = 1/8;
                     }
+                    
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_2D, texture);
+                    gl.uniform1i(tex_sampler, 0);
                     
                     gl.bindBuffer(gl.ARRAY_BUFFER, tiles_vertex_buffer);
                     gl.bufferData(gl.ARRAY_BUFFER, tiles_vertex_array, gl.STATIC_DRAW);
                     gl.vertexAttribPointer(vertex_pos_attrib, 2, gl.FLOAT, false, 0, 0);
                     
                     gl.bindBuffer(gl.ARRAY_BUFFER, tiles_texture_buffer);
+                    gl.bufferData(gl.ARRAY_BUFFER, tiles_texture_array, gl.STATIC_DRAW);
                     gl.vertexAttribPointer(vertex_tex_attrib, 2, gl.FLOAT, false, 0, 0);
                     
                     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, tiles_index_buffer);
