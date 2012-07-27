@@ -12,6 +12,7 @@
              (C) 2011 Tom Carden, released under the same BSD license as D3 itself: 
              https://github.com/mbostock/d3/blob/master/LICENSE
              Forks welcome! -->
+        <script src="image-queue.js"></script>
         <script src="http://mbostock.github.com/d3/d3.min.js"></script>
 
         <script id="shader-vs" type="x-shader/x-vertex">
@@ -137,8 +138,7 @@
                 // set up a texture
                 
                 var tex_sampler = gl.getUniformLocation(program, 'texture_sampler'),
-                    texture = gl.createTexture(),
-                    img = new Image();
+                    texture = gl.createTexture();
                 
                 gl.bindTexture(gl.TEXTURE_2D, texture);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256*8, 256*8, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
@@ -190,22 +190,36 @@
                 
                 gl.uniformMatrix4fv(view, false, mat4);
                 
+                var queue = ImageQueue(),
+                    blank = new Image();
+                    
+                blank.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAMAAABrrFhUAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAAZQTFRFMzMzAAAAI5ZZ1QAAAFhJREFUeNrswQEBAAAAgJD+r+4ICgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFgAAQYAAQ8AAbQIco0AAAAASUVORK5CYII=';
+                setInterval(function() { queue.process() }, 250);
+                
                 function tileKey(tile)
                 {
                     return [tile.z, tile.c, tile.r].join('/');
                 }
                 
+                function cancelTile(tile)
+                {
+                    var src = 'slimjim.php?url=http://tile.stamen.com/toner/'+tileKey(tile)+'.png';
+
+                    queue.cancel(src);
+                }
+                
                 function loadTile(tile, s, t)
                 {
-                    var img = new Image();
+                    var src = 'slimjim.php?url=http://tile.stamen.com/toner/'+tileKey(tile)+'.png';
                     
-                    img.onload = function()
+                    var onload = function(err, img)
                     {
                         gl.texSubImage2D(gl.TEXTURE_2D, 0, s*256*8, t*256*8, gl.RGBA, gl.UNSIGNED_BYTE, img);
                         redraw();
                     }
                     
-                    img.src = 'slimjim.php?url=http://tile.stamen.com/toner/'+tileKey(tile)+'.png';
+                    gl.texSubImage2D(gl.TEXTURE_2D, 0, s*256*8, t*256*8, gl.RGBA, gl.UNSIGNED_BYTE, blank);
+                    queue.add(src, onload);
                 }
 
                 function redraw()
@@ -218,6 +232,7 @@
                         {
                             texture_slots[tile_textures[key].slot] = 0;
                             delete tile_textures[key];
+                            cancelTile(exiting[i]);
                         }
                     }
 
@@ -347,94 +362,6 @@
                 return 'http://otile1.mqcdn.com/tiles/1.0.0/osm/'+z+'/'+x+'/'+y+'.jpg';
             }
             
-           /**
-            * Closure for a single queue.
-            *
-            * loadedTiles is an object: [src] --> msec when load completed.
-            *
-            * Returns an object with addTo, removeFrom, removeOpen,
-            * and process functions attached.
-            */
-            function Queue(coord, loadedTiles)
-            {
-                var queue = [],
-                    queueById = {},
-                    numOpenRequests = 0,
-                    requestById = {};
-                
-               /**
-                * Called with selection.each(), this == <img>.
-                */
-                function addTo(tile, i)
-                {
-                    var src = provider(tile);
-                    if (src in loadedTiles) {
-                        // if we've seen it this session the browser cache probably has it                    
-                        d3.select(this).attr("src", src);
-                    } else {
-                        var item = { id: this.id, img: this };
-                        queue.push(item);
-                        queueById[item.id] = item;
-                    }
-                }
-    
-               /**
-                * Called with selection.each(), this == <img>.
-                */
-                function removeFrom(tile, i)
-                {
-                    // attempt to cancel loading for incomplete tiles
-                    // and prevent very large/tiny tiles from being scaled
-                    // (remove these immediately so they don't slow down positioning)
-                    if (!this.complete || (coord.z - tile.z > 5) || (tile.z - coord.z > 2)) {
-                        this.src = null;
-                        d3.select(this).remove();
-                    }
-                    // also clear the open request
-                    removeOpen(this);
-                    // and mark the image null in the queue so it will be skipped
-                    var item = queueById[this.id];
-                    if (item) {
-                        item.img = null;
-                        delete queueById[this.id];
-                    }
-                }
-    
-               /**
-                * Called when tiles are complete /or/ canceled.
-                */
-                function removeOpen(img)
-                {
-                    var request = requestById[img.id];
-                    if (request) {
-                        request.img = null;
-                        delete requestById[img.id];
-                        numOpenRequests--;
-                    }            
-                }
-                
-               /**
-                * Request up to 8 things from the queue, skipping blank items.
-                */
-                function process()
-                {
-                    while (numOpenRequests < 8 && queue.length > 0) {
-                        var request = queue.shift();
-                        if (request.img && request.img.parentNode) {
-                            // luckily there's a magic mapping inside d3
-                            // that knows how to pass the correct data to provider()
-                            d3.select(request.img) 
-                                .attr("src", provider);
-                            requestById[request.id] = request; 
-                            numOpenRequests++;
-                        }
-                        delete queueById[request.id];                        
-                    }
-                }
-                
-                return {addTo: addTo, removeFrom: removeFrom, removeOpen: removeOpen, process: process};
-            };
-            
             // ----- Tile Positioning Functions
             
             // ----- end Tile Positioning Functions
@@ -485,8 +412,7 @@
                     h = window.innerHeight,
                     center = {x: w/2, y: h/2 }; // center of map in pixels
                     
-                var map = d3.select(parent),
-                    queue = Queue(coord, loadedTiles);
+                var map = d3.select(parent);
                 
                 d3.timer(redraw);
                 
@@ -704,9 +630,6 @@
                             .style("width", width)
                             .style("height", height);
                     }                    
-
-                    // see what's new
-                    queue.process();
 
                     return true;
                 }
