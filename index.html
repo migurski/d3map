@@ -198,7 +198,7 @@
                 
                 function tileKey(tile)
                 {
-                    return [tile.z, tile.c, tile.r].join('/');
+                    return [tile.z, Math.floor(tile.c), Math.floor(tile.r)].join('/');
                 }
                 
                 function cancelTile(tile)
@@ -210,14 +210,27 @@
                 
                 function loadTile(tile, s, t)
                 {
-                    var src = 'slimjim.php?url=http://tile.stamen.com/toner/'+tileKey(tile)+'.png';
+                    var key = tileKey(tile),
+                        src = 'slimjim.php?url=http://tile.stamen.com/toner/'+key+'.png';
                     
                     var onload = function(err, img)
                     {
-                        gl.texSubImage2D(gl.TEXTURE_2D, 0, s*256*8, t*256*8, gl.RGBA, gl.UNSIGNED_BYTE, img);
-                        redraw();
+                        if(err != undefined)
+                        {
+                            return;
+                        }
+                        
+                        console.log('loaded', key);
+                    
+                        if(tile_textures.hasOwnProperty(key))
+                        {
+                            tile_textures[key].loaded = true;
+                            gl.texSubImage2D(gl.TEXTURE_2D, 0, s*256*8, t*256*8, gl.RGBA, gl.UNSIGNED_BYTE, img);
+                            redraw();
+                        }
                     }
                     
+                    tile_textures[key].loaded = false;
                     gl.texSubImage2D(gl.TEXTURE_2D, 0, s*256*8, t*256*8, gl.RGBA, gl.UNSIGNED_BYTE, blank);
                     queue.add(src, onload);
                 }
@@ -226,13 +239,13 @@
                 {
                     for(var i = 0; i < exiting.length; i++)
                     {
+                        cancelTile(exiting[i]);
                         var key = tileKey(exiting[i]);
                     
                         if(tile_textures.hasOwnProperty(key))
                         {
                             texture_slots[tile_textures[key].slot] = 0;
                             delete tile_textures[key];
-                            cancelTile(exiting[i]);
                         }
                     }
 
@@ -255,7 +268,7 @@
                                     t = Math.floor(slot / 8) / 8;
                                 
                                 texture_slots[slot] = 1;
-                                tile_textures[key] = {tile: tile, slot: slot, s: s, t: t};
+                                tile_textures[key] = {tile: tile, slot: slot, s: s, t: t, loaded: null};
 
                                 loadTile(tile, s, t);
                                 break;
@@ -265,6 +278,11 @@
                     
                     for(var i = 0; i < tiles.length; i++)
                     {
+                        if(tiles[i].z != tiles[0].z)
+                        {
+                            break;
+                        }
+                    
                         var x = tiles[i].x,
                             y = tiles[i].y,
                             w = tiles[i].w,
@@ -280,20 +298,61 @@
                         tiles_vertex_array[off + 6] = x;
                         tiles_vertex_array[off + 7] = y + h;
                         
-                        var key = tileKey(tiles[i]);
+                        var nativeTile = tiles[i],
+                            currentTile = nativeTile;
                         
-                        if(tile_textures.hasOwnProperty(key))
+                        while(true)
                         {
-                            var s = tile_textures[key].s, t = tile_textures[key].t;
+                            var key = tileKey(currentTile),
+                                zoomedTile = {z: currentTile.z-1, c: currentTile.c/2, r: currentTile.r/2};
                             
-                            tiles_texture_array[off + 0] = s;
-                            tiles_texture_array[off + 1] = t;
-                            tiles_texture_array[off + 2] = s + 1/8;
-                            tiles_texture_array[off + 3] = t;
-                            tiles_texture_array[off + 4] = s + 1/8;
-                            tiles_texture_array[off + 5] = t + 1/8;
-                            tiles_texture_array[off + 6] = s;
-                            tiles_texture_array[off + 7] = t + 1/8;
+                            if(tile_textures.hasOwnProperty(key) && tile_textures[key].loaded)
+                            {
+                                var s = tile_textures[key].s, t = tile_textures[key].t;
+                                
+                                s += (currentTile.c - Math.floor(currentTile.c)) * 1/8;
+                                t += (currentTile.r - Math.floor(currentTile.r)) * 1/8;
+                                
+                                // possibly shrink the step
+                                var step = Math.pow(2, currentTile.z - nativeTile.z) * 1/8;
+                                
+                                tiles_texture_array[off + 0] = s;
+                                tiles_texture_array[off + 1] = t;
+                                tiles_texture_array[off + 2] = s + step;
+                                tiles_texture_array[off + 3] = t;
+                                tiles_texture_array[off + 4] = s + step;
+                                tiles_texture_array[off + 5] = t + step;
+                                tiles_texture_array[off + 6] = s;
+                                tiles_texture_array[off + 7] = t + step;
+                                
+                                break;
+                            }
+                            
+                            key = tileKey(nativeTile);
+                            
+                            // have we run off the end?
+                            if(currentTile.z == 0)
+                            {
+                                if(tile_textures.hasOwnProperty(key))
+                                {
+                                    var s = tile_textures[key].s, t = tile_textures[key].t;
+                                    
+                                    var step = 1/8;
+                                    
+                                    tiles_texture_array[off + 0] = s;
+                                    tiles_texture_array[off + 1] = t;
+                                    tiles_texture_array[off + 2] = s + step;
+                                    tiles_texture_array[off + 3] = t;
+                                    tiles_texture_array[off + 4] = s + step;
+                                    tiles_texture_array[off + 5] = t + step;
+                                    tiles_texture_array[off + 6] = s;
+                                    tiles_texture_array[off + 7] = t + step;
+                                }
+
+                                break;
+                            }
+                            
+                            currentTile = zoomedTile;
                         }
                     }
                     
@@ -306,7 +365,7 @@
                     gl.vertexAttribPointer(vertex_tex_attrib, 2, gl.FLOAT, false, 0, 0);
                     
                     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, tiles_index_buffer);
-                    gl.drawElements(gl.TRIANGLES, tiles.length * 6, gl.UNSIGNED_SHORT, 0);
+                    gl.drawElements(gl.TRIANGLES, i * 6, gl.UNSIGNED_SHORT, 0);
                 }
                 
                 return redraw;
@@ -575,12 +634,13 @@
 
                     function addParentIfNeeded(tile)
                     {
-                        if (tile.z > 0 && tile.z > coord.z - 3) {
+                        if (tile.z > 0 && tile.z > coord.z - 5) {
                             var src = provider(tile);
                             if ((tile.z > coord.z - 1) || !(src in loadedTiles) || (Date.now() - loadedTiles[src] < 250)) {
                                 tile = Coordinates.container(Coordinates.zoomedBy(tile, -1));
                                 src = provider(tile);
-                                if (src in loadedTiles && !(src in uniqueCompensations)) {
+                                if (!(src in uniqueCompensations))
+                                {
                                     uniqueCompensations[src] = true;
                                     compensationCoords.push(tile);
                                 }
