@@ -10,18 +10,8 @@ function ImageQueue()
     {
         var request = {href: href, onloaded: onload};
 
-        if(request.href in closedRequests)
-        {
-            // If we've seen it this session, the browser cache probably has it.
-
-            loadImage(request);
-
-        } else {
-            // Never-before-seen images go to the queue.
-
-            queueList.push(request);
-            queueByHref[request.href] = request;
-        }
+        queueList.push(request);
+        queueByHref[request.href] = request;
     }
 
     function cancelLoad(href)
