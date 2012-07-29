@@ -220,7 +220,7 @@
                             return;
                         }
                         
-                        console.log('loaded', key);
+                        //console.log('loaded', key);
                     
                         if(tile_textures.hasOwnProperty(key))
                         {
@@ -642,7 +642,7 @@
 
                     function addParentIfNeeded(tile)
                     {
-                        if (tile.z > 0 && tile.z > coord.z - 5) {
+                        if (tile.z > 0 && tile.z > coord.z - 10) {
                             var src = provider(tile);
                             if ((tile.z > coord.z - 1) || !(src in loadedTiles) || (Date.now() - loadedTiles[src] < 250)) {
                                 tile = Coordinates.container(Coordinates.zoomedBy(tile, -1));
@@ -678,7 +678,7 @@
                     tiles.enter().append('div')
                         .attr("id", coordString)
                         .attr("class", "tile")
-                        .text(coordString)
+                        //.text(coordString)
                         .each(function(tile) { status.entering.push(tile) });
 
                     // TODO: on('error')?
