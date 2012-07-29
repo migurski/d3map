@@ -234,6 +234,12 @@
                     gl.texSubImage2D(gl.TEXTURE_2D, 0, s*256*8, t*256*8, gl.RGBA, gl.UNSIGNED_BYTE, blank);
                     queue.add(src, onload);
                 }
+                
+                function prioritizeZoom(zoom)
+                {
+                    var match = '/toner/' + zoom.toFixed(0) + '/';
+                    queue.prioritize(match);
+                }
 
                 function redraw()
                 {
@@ -275,6 +281,8 @@
                             }
                         }
                     }
+                    
+                    prioritizeZoom(tiles[0].z);
                     
                     for(var i = 0; i < tiles.length; i++)
                     {

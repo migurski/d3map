@@ -51,6 +51,16 @@ function ImageQueue()
             delete queueByHref[href];
         }
     }
+    
+    function prioritizeQueue(pattern)
+    {
+        var sortFunction = function(r1, r2)
+        {
+            return Number(Boolean(r2.href.match(pattern))) - Number(Boolean(r1.href.match(pattern)));
+        }
+    
+        queueList.sort(sortFunction);
+    }
 
    /**
     * Request up to 4 things from the queue, skipping blank items.
@@ -93,5 +103,5 @@ function ImageQueue()
         request.img.src = request.href;
     }
 
-    return {add: addImage, cancel: cancelLoad, process: processQueue};
+    return {add: addImage, cancel: cancelLoad, process: processQueue, prioritize: prioritizeQueue};
 };
