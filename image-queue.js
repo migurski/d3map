@@ -9,7 +9,7 @@ function ImageQueue()
     function addImage(href, onload)
     {
         var request = {href: href, onloaded: onload};
-
+        
         queueList.push(request);
         queueByHref[request.href] = request;
     }
@@ -29,7 +29,7 @@ function ImageQueue()
                 openRequests[href].img.src = "about:";
                 openRequests[href].img = null;
             }
-
+            
             delete openRequests[href];
             numOpenRequests--;
         }
@@ -38,6 +38,8 @@ function ImageQueue()
 
         if(href in queueByHref)
         {
+            // get the href out of the queue completely
+            queueList = queueList.filter(function(req) { return req.href != href });
             delete queueByHref[href];
         }
     }
