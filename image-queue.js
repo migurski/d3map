@@ -38,8 +38,7 @@ function ImageQueue()
 
         if(href in queueByHref)
         {
-            // get the href out of the queue completely
-            queueList = queueList.filter(function(req) { return req.href != href });
+            // get the href out of the queue
             delete queueByHref[href];
         }
     }
@@ -61,16 +60,15 @@ function ImageQueue()
     {
         while(numOpenRequests < 4 && queueList.length > 0)
         {
-            var request = queueList.shift();
+            var href = queueList.shift().href;
 
-            if(request.href && request.href in queueByHref)
+            if(href in queueByHref)
             {
-                loadImage(request);
-                openRequests[request.href] = request; 
+                loadImage(queueByHref[href]);
+                openRequests[href] = queueByHref[href];
+                delete queueByHref[href];                        
                 numOpenRequests++;
             }
-
-            delete queueByHref[request.href];                        
         }
     }
     
