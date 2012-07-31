@@ -51,70 +51,8 @@
             
         </script>
     
+        <script src="gl-boilerplate.js" type="application/javascript"></script>
         <script type="text/javascript">
-            
-            // http://paulirish.com/2011/requestanimationframe-for-smart-animating/
-            // http://my.opera.com/emoller/blog/2011/12/20/requestanimationframe-for-smart-er-animating
-            
-            // requestAnimationFrame polyfill by Erik Möller
-            // fixes from Paul Irish and Tino Zijdel
-            
-            (function() {
-                var lastTime = 0;
-                var vendors = ['ms', 'moz', 'webkit', 'o'];
-                for(var x = 0; x < vendors.length && !window.requestAnimationFrame; ++x) {
-                    window.requestAnimationFrame = window[vendors[x]+'RequestAnimationFrame'];
-                    window.cancelAnimationFrame = window[vendors[x]+'CancelAnimationFrame'] 
-                                               || window[vendors[x]+'CancelRequestAnimationFrame'];
-                }
-             
-                if (!window.requestAnimationFrame)
-                    window.requestAnimationFrame = function(callback, element) {
-                        var currTime = new Date().getTime();
-                        var timeToCall = Math.max(0, 16 - (currTime - lastTime));
-                        var id = window.setTimeout(function() { callback(currTime + timeToCall); }, 
-                          timeToCall);
-                        lastTime = currTime + timeToCall;
-                        return id;
-                    };
-             
-                if (!window.cancelAnimationFrame)
-                    window.cancelAnimationFrame = function(id) {
-                        clearTimeout(id);
-                    };
-            }());
-        
-            function linkProgram(gl, vsource, fsource)
-            {
-                var program = gl.createProgram(),
-                    vshader = createShader(gl, vsource, gl.VERTEX_SHADER),
-                    fshader = createShader(gl, fsource, gl.FRAGMENT_SHADER);
-            
-                gl.attachShader(program, vshader);
-                gl.attachShader(program, fshader);
-                gl.linkProgram(program);
-            
-                if(!gl.getProgramParameter(program, gl.LINK_STATUS))
-                {
-                    throw gl.getProgramInfoLog(program);
-                }
-                
-                return program;
-            }
-            
-            function createShader(gl, source, type)
-            {
-                var shader = gl.createShader(type);
-                gl.shaderSource(shader, source);
-                gl.compileShader(shader);
-            
-                if(!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
-                {
-                    throw gl.getShaderInfoLog(shader);
-                }
-            
-                return shader;
-            }
             
             function theGLPart(tiles, entering, exiting)
             {
@@ -206,10 +144,17 @@
                     var src = 'slimjim.php?url=http://tile.stamen.com/toner/'+tileKey(tile)+'.png';
 
                     queue.cancel(src);
+                    
+                    // console.log('canceled', tileKey(tile));
                 }
+                
+                var tileindex = 0;
                 
                 function loadTile(tile, s, t)
                 {
+                    tileindex++;
+                    var _tileindex = tileindex;
+                
                     var key = tileKey(tile),
                         src = 'slimjim.php?url=http://tile.stamen.com/toner/'+key+'.png';
                     
@@ -217,22 +162,28 @@
                     {
                         if(err != undefined)
                         {
+                            // console.log('error in', key, (s*8 + t*64), _tileindex);
                             return;
                         }
-                        
-                        //console.log('loaded', key);
                     
                         if(tile_textures.hasOwnProperty(key))
                         {
                             tile_textures[key].loaded = true;
                             gl.texSubImage2D(gl.TEXTURE_2D, 0, s*256*8, t*256*8, gl.RGBA, gl.UNSIGNED_BYTE, img);
                             redraw();
+                            
+                            // console.log('drawing', key, (s*8 + t*64), _tileindex);
+
+                        } else {
+                            // console.log('wiffed', key, (s*8 + t*64), _tileindex);
                         }
                     }
                     
                     tile_textures[key].loaded = false;
                     gl.texSubImage2D(gl.TEXTURE_2D, 0, s*256*8, t*256*8, gl.RGBA, gl.UNSIGNED_BYTE, blank);
                     queue.add(src, onload);
+                    
+                    // console.log('added', key, (s*8 + t*64), _tileindex);
                 }
                 
                 function prioritizeZoom(zoom)
