@@ -131,7 +131,7 @@
                 var queue = ImageQueue(),
                     blank = new Image();
                     
-                blank.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAMAAABrrFhUAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAAZQTFRFMzMzAAAAI5ZZ1QAAAFhJREFUeNrswQEBAAAAgJD+r+4ICgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFgAAQYAAQ8AAbQIco0AAAAASUVORK5CYII=';
+                blank.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEAAQMAAABmvDolAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAANQTFRFZmZmfFaCBAAAAB9JREFUGBntwQENAAAAwqD3T20ON6AAAAAAAAAAAL4NIQAAAQWThvcAAAAASUVORK5CYII=';
                 setInterval(function() { queue.process() }, 250);
                 
                 function tileKey(tile)
@@ -425,7 +425,6 @@
                 var coord = {c: 2, r: 2, z: 2}, // col, row, zoom
                     roundCoord = null,          // coord at an integer zoom level
                     tileSize = {w: 256, h: 256},// px
-                    loadedTiles = {},           // [src] --> millis when load completed
                     w = window.innerWidth,
                     h = window.innerHeight,
                     center = {x: w/2, y: h/2 }; // center of map in pixels
@@ -506,37 +505,13 @@
                     return matrixString(scale, x, y, tileSize.w/2.0, tileSize.h/2.0);
                 }
                 
-               /**
-                * Called with selection.on(), this == <img>.
-                */
-                function onTileLoaded(tile)
-                {
-                    loadedTiles[this.src] = Date.now();
-                    
-                    d3.select(this)
-                      .style("display", "block")
-                      .style("opacity", 0.0)
-                        .transition()
-                          .duration(250)
-                            .style("opacity", 1.0);
-
-                    queue.removeOpen(this);
-                    // request redraw (which will also check queue)
-                    d3.timer(redraw,50); // TODO: only remove compensation tiles for this tile instead of a full redraw
-                }
-                
-                    // don't show above/below the poles
+                // don't show above/below the poles
                 function validCoordinateFilter(tile)
                 {
                     var minRow = 0, 
                         maxRow = Math.pow(2, tile.z);                    
 
                     return minRow <= tile.r && tile.r < maxRow;                
-                }
-                
-                function loadedLongAgo()
-                {
-                    return (this.src in loadedTiles) && (Date.now() - loadedTiles[this.src] > 500);
                 }
                 
                 var visibleCoords = [];
@@ -594,18 +569,15 @@
                     function addParentIfNeeded(tile)
                     {
                         if (tile.z > 0 && tile.z > coord.z - 10) {
-                            var src = provider(tile);
-                            if ((tile.z > coord.z - 1) || !(src in loadedTiles) || (Date.now() - loadedTiles[src] < 250)) {
-                                tile = Coordinates.container(Coordinates.zoomedBy(tile, -1));
-                                src = provider(tile);
-                                if (!(src in uniqueCompensations))
-                                {
-                                    uniqueCompensations[src] = true;
-                                    compensationCoords.push(tile);
-                                }
-                                // better continuity if we loop, but slower (needs tuning)
-                                addParentIfNeeded(tile);
+                            tile = Coordinates.container(Coordinates.zoomedBy(tile, -1));
+                            src = provider(tile);
+                            if (!(src in uniqueCompensations))
+                            {
+                                uniqueCompensations[src] = true;
+                                compensationCoords.push(tile);
                             }
+                            // better continuity if we loop, but slower (needs tuning)
+                            addParentIfNeeded(tile);
                         }
                     }
 
