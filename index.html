@@ -20,10 +20,10 @@
             uniform mat4 view;
             
             attribute vec2 pos;
-            attribute vec2 tex;
+            attribute vec3 tex;
             
             varying vec2 vertex_coord;
-            varying vec2 texture_coord;
+            varying vec3 texture_coord;
     
             void main()
             {
@@ -39,14 +39,28 @@
             
             precision mediump float;
             
-            uniform sampler2D texture_sampler;
+            uniform sampler2D sampler0;
+            uniform sampler2D sampler1;
+            uniform sampler2D sampler2;
     
             varying vec2 vertex_coord;
-            varying vec2 texture_coord;
+            varying vec3 texture_coord;
             
             void main()
             {
-                gl_FragColor = texture2D(texture_sampler, vec2(texture_coord.s, texture_coord.t)); //vec4(1, 1, 1, 1);
+                float r = texture_coord[0];
+                float s = texture_coord[1];
+                float t = texture_coord[2];
+            
+                if(r == 0.0) {
+                    gl_FragColor = texture2D(sampler0, vec2(s, t));
+                
+                } else if(r == 1.0) {
+                    gl_FragColor = texture2D(sampler1, vec2(s, t));
+                
+                } else {
+                    gl_FragColor = texture2D(sampler2, vec2(s, t));
+                }
             }
             
         </script>
@@ -73,21 +87,21 @@
                 gl.enableVertexAttribArray(vertex_pos_attrib);
                 gl.enableVertexAttribArray(vertex_tex_attrib);
                 
-                // set up a texture
+                // set up three textures
                 
-                var tex_sampler = gl.getUniformLocation(program, 'texture_sampler'),
-                    texture = gl.createTexture();
+                for(var i = 0; i < 3; i++)
+                {
+                    gl.activeTexture(gl['TEXTURE'+i]);
+                    gl.uniform1i(gl.getUniformLocation(program, 'sampler'+i), i);
+    
+                    gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256*8, 256*8, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                }
                 
-                gl.bindTexture(gl.TEXTURE_2D, texture);
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256*8, 256*8, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-                gl.generateMipmap(gl.TEXTURE_2D);
-                
-                gl.activeTexture(gl.TEXTURE0);
-                gl.uniform1i(tex_sampler, 0);
-                
-                var texture_slots = new Array(8*8),
+                var texture_targets = [gl.TEXTURE0, gl.TEXTURE1, gl.TEXTURE2],
+                    texture_slots = new Array(3 * 8 * 8),
                     tile_textures = {};
                 
                 // set up array buffer thingies
@@ -96,7 +110,7 @@
                     tiles_texture_buffer = gl.createBuffer(),
                     tiles_index_buffer = gl.createBuffer(),
                     tiles_vertex_array = new Float32Array(256 * 8),
-                    tiles_texture_array = new Float32Array(256 * 8),
+                    tiles_texture_array = new Float32Array(256 * 12),
                     tiles_index_array = new Uint16Array(256 * 6);
             
                 // populate triangle indexes
@@ -146,12 +160,12 @@
                     queue.cancel(src);
                     
                     // console.log('canceled', tileKey(tile));
-                    console.log('queue', queue.state().join('/'), 'slots', texture_slots.filter(Boolean).length);
+                    // console.log('queue', queue.state().join('/'), 'slots', texture_slots.filter(Boolean).length);
                 }
                 
                 var tileindex = 0;
                 
-                function loadTile(tile, s, t)
+                function loadTile(tile, r, s, t)
                 {
                     tileindex++;
                     var _tileindex = tileindex;
@@ -161,7 +175,7 @@
                     
                     var onload = function(err, img)
                     {
-                        console.log('queue', queue.state().join('/'), 'slots', texture_slots.filter(Boolean).length);
+                        // console.log('queue', queue.state().join('/'), 'slots', texture_slots.filter(Boolean).length);
 
                         if(err != undefined)
                         {
@@ -172,6 +186,7 @@
                         if(tile_textures.hasOwnProperty(key))
                         {
                             tile_textures[key].loaded = true;
+                            gl.activeTexture(texture_targets[r]);
                             gl.texSubImage2D(gl.TEXTURE_2D, 0, s*256*8, t*256*8, gl.RGBA, gl.UNSIGNED_BYTE, img);
                             redraw();
                             
@@ -183,6 +198,7 @@
                     }
                     
                     tile_textures[key].loaded = false;
+                    gl.activeTexture(texture_targets[r]);
                     gl.texSubImage2D(gl.TEXTURE_2D, 0, s*256*8, t*256*8, gl.RGBA, gl.UNSIGNED_BYTE, blank);
                     queue.add(src, onload);
                     
@@ -224,13 +240,16 @@
                             // look for a free texture slot
                             if(texture_slots[slot] == undefined)
                             {
-                                var s = (slot % 8) / 8,
-                                    t = Math.floor(slot / 8) / 8;
+                                // r: texture target
+                                // s, t: column, row
+                                var r = Math.floor(slot / 64),
+                                    s = (slot % 8) / 8,
+                                    t = Math.floor((slot % 64) / 8) / 8;
                                 
                                 texture_slots[slot] = 1;
-                                tile_textures[key] = {tile: tile, slot: slot, s: s, t: t, loaded: null};
+                                tile_textures[key] = {tile: tile, slot: slot, r: r, s: s, t: t, loaded: null};
 
-                                loadTile(tile, s, t);
+                                loadTile(tile, r, s, t);
                                 break;
                             }
                         }
@@ -263,6 +282,8 @@
                         var nativeTile = tiles[i],
                             currentTile = nativeTile;
                         
+                        off = i * 12;
+                        
                         while(true)
                         {
                             var key = tileKey(currentTile),
@@ -270,7 +291,7 @@
                             
                             if(tile_textures.hasOwnProperty(key) && tile_textures[key].loaded)
                             {
-                                var s = tile_textures[key].s, t = tile_textures[key].t;
+                                var r = tile_textures[key].r, s = tile_textures[key].s, t = tile_textures[key].t;
                                 
                                 s += (currentTile.c - Math.floor(currentTile.c)) * 1/8;
                                 t += (currentTile.r - Math.floor(currentTile.r)) * 1/8;
@@ -278,14 +299,18 @@
                                 // possibly shrink the step
                                 var step = Math.pow(2, currentTile.z - nativeTile.z) * 1/8;
                                 
-                                tiles_texture_array[off + 0] = s;
-                                tiles_texture_array[off + 1] = t;
-                                tiles_texture_array[off + 2] = s + step;
-                                tiles_texture_array[off + 3] = t;
+                                tiles_texture_array[off + 0] = r;
+                                tiles_texture_array[off + 1] = s;
+                                tiles_texture_array[off + 2] = t;
+                                tiles_texture_array[off + 3] = r;
                                 tiles_texture_array[off + 4] = s + step;
-                                tiles_texture_array[off + 5] = t + step;
-                                tiles_texture_array[off + 6] = s;
-                                tiles_texture_array[off + 7] = t + step;
+                                tiles_texture_array[off + 5] = t;
+                                tiles_texture_array[off + 6] = r;
+                                tiles_texture_array[off + 7] = s + step;
+                                tiles_texture_array[off + 8] = t + step;
+                                tiles_texture_array[off + 9] = r;
+                                tiles_texture_array[off +10] = s;
+                                tiles_texture_array[off +11] = t + step;
                                 
                                 break;
                             }
@@ -297,18 +322,22 @@
                             {
                                 if(tile_textures.hasOwnProperty(key))
                                 {
-                                    var s = tile_textures[key].s, t = tile_textures[key].t;
+                                    var r = tile_textures[key].r, s = tile_textures[key].s, t = tile_textures[key].t;
                                     
                                     var step = 1/8;
                                     
-                                    tiles_texture_array[off + 0] = s;
-                                    tiles_texture_array[off + 1] = t;
-                                    tiles_texture_array[off + 2] = s + step;
-                                    tiles_texture_array[off + 3] = t;
+                                    tiles_texture_array[off + 0] = r;
+                                    tiles_texture_array[off + 1] = s;
+                                    tiles_texture_array[off + 2] = t;
+                                    tiles_texture_array[off + 3] = r;
                                     tiles_texture_array[off + 4] = s + step;
-                                    tiles_texture_array[off + 5] = t + step;
-                                    tiles_texture_array[off + 6] = s;
-                                    tiles_texture_array[off + 7] = t + step;
+                                    tiles_texture_array[off + 5] = t;
+                                    tiles_texture_array[off + 6] = r;
+                                    tiles_texture_array[off + 7] = s + step;
+                                    tiles_texture_array[off + 8] = t + step;
+                                    tiles_texture_array[off + 9] = r;
+                                    tiles_texture_array[off +10] = s;
+                                    tiles_texture_array[off +11] = t + step;
                                 }
 
                                 break;
@@ -324,7 +353,7 @@
                     
                     gl.bindBuffer(gl.ARRAY_BUFFER, tiles_texture_buffer);
                     gl.bufferData(gl.ARRAY_BUFFER, tiles_texture_array, gl.STATIC_DRAW);
-                    gl.vertexAttribPointer(vertex_tex_attrib, 2, gl.FLOAT, false, 0, 0);
+                    gl.vertexAttribPointer(vertex_tex_attrib, 3, gl.FLOAT, false, 0, 0);
                     
                     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, tiles_index_buffer);
                     gl.drawElements(gl.TRIANGLES, i * 6, gl.UNSIGNED_SHORT, 0);
@@ -571,7 +600,7 @@
 
                     function addParentIfNeeded(tile)
                     {
-                        if (tile.z > 0 && tile.z > coord.z - 10) {
+                        if (tile.z > 0 && tile.z > coord.z - 18) {
                             tile = Coordinates.container(Coordinates.zoomedBy(tile, -1));
                             src = provider(tile);
                             if (!(src in uniqueCompensations))
