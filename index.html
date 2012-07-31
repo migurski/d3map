@@ -87,7 +87,7 @@
                 gl.activeTexture(gl.TEXTURE0);
                 gl.uniform1i(tex_sampler, 0);
                 
-                var texture_slots = new Int8Array(8*8),
+                var texture_slots = new Array(8*8),
                     tile_textures = {};
                 
                 // set up array buffer thingies
@@ -146,6 +146,7 @@
                     queue.cancel(src);
                     
                     // console.log('canceled', tileKey(tile));
+                    console.log('queue', queue.state().join('/'), 'slots', texture_slots.filter(Boolean).length);
                 }
                 
                 var tileindex = 0;
@@ -160,6 +161,8 @@
                     
                     var onload = function(err, img)
                     {
+                        console.log('queue', queue.state().join('/'), 'slots', texture_slots.filter(Boolean).length);
+
                         if(err != undefined)
                         {
                             // console.log('error in', key, (s*8 + t*64), _tileindex);
@@ -201,7 +204,7 @@
                     
                         if(tile_textures.hasOwnProperty(key))
                         {
-                            texture_slots[tile_textures[key].slot] = 0;
+                            texture_slots[tile_textures[key].slot] = undefined;
                             delete tile_textures[key];
                         }
                     }
@@ -219,7 +222,7 @@
                         for(var slot = 0; slot < texture_slots.length; slot++)
                         {
                             // look for a free texture slot
-                            if(texture_slots[slot] == 0)
+                            if(texture_slots[slot] == undefined)
                             {
                                 var s = (slot % 8) / 8,
                                     t = Math.floor(slot / 8) / 8;

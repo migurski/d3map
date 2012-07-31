@@ -92,6 +92,11 @@ function ImageQueue()
 
         request.img.src = request.href;
     }
+    
+    function queueState()
+    {
+        return [numOpenRequests, queueList.length];
+    }
 
-    return {add: addImage, cancel: cancelLoad, process: processQueue, prioritize: prioritizeQueue};
+    return {add: addImage, cancel: cancelLoad, process: processQueue, prioritize: prioritizeQueue, state: queueState};
 };
