@@ -653,9 +653,15 @@
                     return true;
                 }
                 
+                function mousePosition()
+                {
+                    var div = map.node();
+                    return {x: d3.mouse(div)[0], y: d3.mouse(div)[1]}
+                }
+                
                 function onMouseDown()
                 {
-                    var prevMouse = {x: d3.event.pageX, y: d3.event.pageY};
+                    var prevMouse = mousePosition();
 
                     d3.select(window)
                         .on('mousemove.map', onMouseMove)
@@ -666,7 +672,7 @@
                     function onMouseMove()
                     {
                         var mouse = prevMouse;
-                        prevMouse = {x: d3.event.pageX, y: d3.event.pageY};
+                        prevMouse = mousePosition();
                         coord = Coordinates.offsetBy(coord, {
                             c: -((prevMouse.x - mouse.x) / tileSize.w),
                             r: -((prevMouse.y - mouse.y) / tileSize.h),
@@ -690,7 +696,7 @@
                     // 18 = max zoom, 0 = min zoom
                     var delta = Math.min(18-coord.z,Math.max(0-coord.z,d3_behavior_zoomDelta()));
                     if (delta != 0) {
-                        var mouse = {x: d3.event.pageX, y: d3.event.pageY};
+                        var mouse = mousePosition();
                         coord = Coordinates.offsetBy(coord, {
                             c: ((mouse.x-center.x) / tileSize.w),
                             r: ((mouse.y-center.y) / tileSize.h),
