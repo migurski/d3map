@@ -716,7 +716,7 @@
                     
                 function onResize()
                 {
-                    center = {x: window.innerWidth/2, y: window.innerHeight/2}
+                    center = {x: map.node().clientWidth/2, y: map.node().clientHeight/2}
                     d3.timer(redraw);
                 }
                 
@@ -795,13 +795,10 @@
 		        overflow: hidden;
 		        margin: 0;
 		        padding: 0;
-		    }
-		    #c, #map
-		    {
-		        border: 1px solid orange;
+		        border-bottom: 1px solid orange;
 		        position: absolute;
-		        top: 10px;
-		        left: 10px;
+		        width: 100%;
+		        height: 600px;
 		    }
 		    div.tile,
 		    img.tile {
@@ -812,26 +809,10 @@
 		        border: 0;
 		        -webkit-transform-origin: 0px 0px;
 		    }
-		    p {
-		        font: bold 12px sans-serif;
-		        position: absolute;
-		        display: block;
-		        right: 5px;
-		        bottom: 5px;
-		        color: white;
-		        text-shadow: 1px 1px 4px rgba(0,0,0,0.75);
-		        z-index: 250;
-		        margin: 0;
-		        padding: 5px;
-		    }
-		    p a {
-		        color: white;
-		    }
 		</style>
     </head>
     <body>
-        <canvas id="c" width="1200" height="300"></canvas>
-        <div id="map" style="width: 1200px; height: 300px;"></div>
-        <p>Tiles &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, CC-BY-SA. Courtesy of <a href="http://www.mapquest.com/" target="_blank">MapQuest</a> <img src="http://developer.mapquest.com/content/osm/mq_logo.png"></p>
+        
+        <div id="map"><canvas id="c" width="1600" height="1200"></canvas></div>
     </body>
 </html>
