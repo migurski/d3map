@@ -70,6 +70,13 @@
             
             function theGLPart(tiles, entering, exiting)
             {
+                //
+                // texture size, grid rows/columns, and overall grid count
+                //
+                var txsz = 2048,
+                    txgd = Math.floor(txsz / (256 + 2)),
+                    txct = txgd * txgd;
+            
                 var c = document.getElementById('c')
                     gl = c.getContext('experimental-webgl');
                 
@@ -87,20 +94,20 @@
                 gl.enableVertexAttribArray(vertex_pos_attrib);
                 gl.enableVertexAttribArray(vertex_tex_attrib);
                 
-                // set up three textures
+                // set up four textures
                 
-                for(var i = 0; i < 3; i++)
+                for(var i = 0; i <= 3; i++)
                 {
                     gl.activeTexture(gl['TEXTURE'+i]);
                     gl.uniform1i(gl.getUniformLocation(program, 'sampler'+i), i);
     
                     gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
-                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256*8, 256*8, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, txsz, txsz, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
                     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
                     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
                 }
                 
-                var texture_targets = [gl.TEXTURE0, gl.TEXTURE1, gl.TEXTURE2],
+                var texture_targets = [gl.TEXTURE0, gl.TEXTURE1, gl.TEXTURE2, gl.TEXTURE3],
                     texture_slots = new Array(3 * 8 * 8),
                     tile_textures = {};
                 
@@ -187,7 +194,13 @@
                         {
                             tile_textures[key].loaded = true;
                             gl.activeTexture(texture_targets[r]);
-                            gl.texSubImage2D(gl.TEXTURE_2D, 0, s*256*8, t*256*8, gl.RGBA, gl.UNSIGNED_BYTE, img);
+
+                            // Put the image down five times to buffer textures slightly
+                            gl.texSubImage2D(gl.TEXTURE_2D, 0, s*txsz - 1, t*txsz, gl.RGBA, gl.UNSIGNED_BYTE, img);
+                            gl.texSubImage2D(gl.TEXTURE_2D, 0, s*txsz + 1, t*txsz, gl.RGBA, gl.UNSIGNED_BYTE, img);
+                            gl.texSubImage2D(gl.TEXTURE_2D, 0, s*txsz, t*txsz - 1, gl.RGBA, gl.UNSIGNED_BYTE, img);
+                            gl.texSubImage2D(gl.TEXTURE_2D, 0, s*txsz, t*txsz + 1, gl.RGBA, gl.UNSIGNED_BYTE, img);
+                            gl.texSubImage2D(gl.TEXTURE_2D, 0, s*txsz,     t*txsz, gl.RGBA, gl.UNSIGNED_BYTE, img);
                             redraw();
                             
                             // console.log('drawing', key, (s*8 + t*64), _tileindex);
@@ -199,7 +212,7 @@
                     
                     tile_textures[key].loaded = false;
                     gl.activeTexture(texture_targets[r]);
-                    gl.texSubImage2D(gl.TEXTURE_2D, 0, s*256*8, t*256*8, gl.RGBA, gl.UNSIGNED_BYTE, blank);
+                    gl.texSubImage2D(gl.TEXTURE_2D, 0, s*txsz, t*txsz, gl.RGBA, gl.UNSIGNED_BYTE, blank);
                     queue.add(src, onload);
                     
                     // console.log('added', key, (s*8 + t*64), _tileindex);
@@ -317,9 +330,9 @@
                             {
                                 // r: texture target
                                 // s, t: column, row
-                                var r = Math.floor(slot / 64),
-                                    s = (slot % 8) / 8,
-                                    t = Math.floor((slot % 64) / 8) / 8;
+                                var r = Math.floor(slot / txct),
+                                    s = (1 + (slot % txgd) * 258) / txsz,
+                                    t = (1 + Math.floor((slot % txct) / txgd) * 258) / txsz;
                                 
                                 texture_slots[slot] = 1;
                                 tile_textures[key] = {tile: tile, slot: slot, r: r, s: s, t: t, loaded: null};
