@@ -465,12 +465,12 @@
             {
                 var coord = {c: 2, r: 2, z: 2}, // col, row, zoom
                     roundCoord = null,          // coord at an integer zoom level
-                    tileSize = {w: 256, h: 256},// px
-                    w = window.innerWidth,
-                    h = window.innerHeight,
-                    center = {x: w/2, y: h/2 }; // center of map in pixels
+                    tileSize = {w: 256, h: 256};// px
                     
-                var map = d3.select(parent);
+                var map = d3.select(parent),
+                    w = map.node().clientWidth,
+                    h = map.node().clientHeight,
+                    center = {x: w/2, y: h/2 }; // center of map in pixels
                 
                 d3.timer(redraw);
                 
@@ -733,6 +733,27 @@
                     d3.timer(redraw);
                 }
                 
+                function zoomTo(zoom)
+                {
+                    var oldzoom = coord.z;
+                    
+                    coord.z = zoom;
+                    coord.r *= Math.pow(2, coord.z - oldzoom);
+                    coord.c *= Math.pow(2, coord.z - oldzoom);
+                    
+                    redraw();
+                }
+                
+                document.getElementById('zoom-in').onclick = function()
+                {
+                    zoomTo(Math.round(coord.z + 1));
+                };
+                
+                document.getElementById('zoom-out').onclick = function()
+                {
+                    zoomTo(Math.round(coord.z - 1));
+                };
+                
                 return status;
             };
 
@@ -822,10 +843,36 @@
 		        border: 0;
 		        -webkit-transform-origin: 0px 0px;
 		    }
+		    
+		    #controls
+		    {
+		        position: absolute;
+		        top: 20px;
+		        left: 60px;
+		    }
+
+		    #controls a
+		    {
+		    	font-family: Helvetica, Arial, sans-serif;
+		    	font-size: 24px;
+		    	font-weight: bold;
+
+		    	background: yellow;
+		    	color: black;
+
+		    	cursor: pointer;
+		    	margin-right: 8px;
+		    	padding: 3px 10px 6px;
+		    }
 		</style>
     </head>
     <body>
-        
-        <div id="map"><canvas id="c" width="1600" height="1200"></canvas></div>
+        <div id="map">
+            <canvas id="c" width="1600" height="1200"></canvas>
+            <div id="controls" class="controls">
+                <a id="zoom-in" title="zoom in">+</a>
+                <a id="zoom-out" title="zoom out">−</a>
+            </div>
+        </div>
     </body>
 </html>
