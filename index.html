@@ -96,7 +96,7 @@
                 
                 // set up four textures
                 
-                for(var i = 0; i <= 3; i++)
+                for(var i = 0; i < 4; i++)
                 {
                     gl.activeTexture(gl['TEXTURE'+i]);
                     gl.uniform1i(gl.getUniformLocation(program, 'sampler'+i), i);
@@ -108,7 +108,7 @@
                 }
                 
                 var texture_targets = [gl.TEXTURE0, gl.TEXTURE1, gl.TEXTURE2, gl.TEXTURE3],
-                    texture_slots = new Array(3 * 8 * 8),
+                    texture_slots = new Array(4 * txct),
                     tile_textures = {};
                 
                 // set up array buffer thingies
